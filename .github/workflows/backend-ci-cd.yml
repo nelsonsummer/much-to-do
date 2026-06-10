@@ -51,3 +51,33 @@ jobs:
           image-ref: muchtodo-api
           format: table
           severity: CRITICAL,HIGH
+
+  deploy:
+    needs: docker-build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to ECR
+        run: |
+          aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin <YOUR_ECR_URI>
+
+      - name: Build & Tag Image
+        run: |
+          docker build -t muchtodo-api .
+          docker tag muchtodo-api:latest <YOUR_ECR_URI>:latest
+
+      - name: Push Image
+        run: |
+          docker push <YOUR_ECR_URI>:latest
+
+      - name: Trigger EC2 Deployment (ASG Refresh)
+        run: |
+          aws autoscaling start-instance-refresh \
+            --auto-scaling-group-name starttech-asg
